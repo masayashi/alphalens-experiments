@@ -19,10 +19,7 @@ def load_factor(path: str) -> pd.Series:
     if isinstance(factor_frame.index, pd.MultiIndex):
         series = factor_frame.squeeze()
         series.index = pd.MultiIndex.from_tuples(
-            [
-                (pd.Timestamp(level0), str(level1))
-                for level0, level1 in series.index.to_list()
-            ],
+            [(pd.Timestamp(level0), str(level1)) for level0, level1 in series.index.to_list()],
             names=["date", "asset"],
         )
     else:
@@ -35,4 +32,3 @@ def load_factor(path: str) -> pd.Series:
         )["factor"]
 
     return series.sort_index()
-

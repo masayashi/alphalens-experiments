@@ -19,4 +19,3 @@ def test_make_simple_momentum_factor_shape_and_index_names() -> None:
     assert factor.index.names == ["date", "asset"]
     assert len(factor) > 0
     assert factor.notna().all()
-

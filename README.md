@@ -1,14 +1,14 @@
 # alphalens-experiments
 
-Scaffold for JP equity factor analysis with `alphalens` (`alphalens-reloaded`).
+日本株のファクター分析を `alphalens`（`alphalens-reloaded`）で行うためのスキャフォールドです。
 
-## Scope
+## 目的
 
-- Target market: Japanese equities (JPX, ticker format like `7203.T`)
-- Goal: run an end-to-end Alphalens tear sheet from sample data
-- Repo-first setup with reproducible dependency management
+- 対象市場: 日本株（JPX、ティッカー形式は `7203.T` など）
+- ゴール: サンプルデータから Alphalens の tear sheet を end-to-end で実行できる状態にする
+- リポジトリ中心で再現可能な依存管理を行う
 
-## Project layout
+## プロジェクト構成
 
 ```text
 .
@@ -28,36 +28,42 @@ Scaffold for JP equity factor analysis with `alphalens` (`alphalens-reloaded`).
 `- tests/
 ```
 
-## Setup (recommended: uv + .venv)
+## セットアップ（推奨: uv + .venv）
 
-1. Install `uv` (one-time):
+1. `uv` をインストール（初回のみ）
 
 ```powershell
 python -m pip install --upgrade uv
 ```
 
-2. Create venv and sync dependencies:
+2. 仮想環境作成と依存同期
 
 ```powershell
 uv venv .venv
 uv sync --extra dev
 ```
 
-3. Run commands through `uv run`:
+3. `uv run` 経由で実行
 
 ```powershell
 uv run pytest -q
 ```
 
-## Quick start
+4. pre-commit フックを有効化
 
-1. Generate sample JP data:
+```powershell
+uv run pre-commit install
+```
+
+## クイックスタート
+
+1. 日本株サンプルデータ生成
 
 ```powershell
 uv run python scripts\generate_sample_jp_data.py
 ```
 
-2. Run Alphalens analysis:
+2. Alphalens 分析実行
 
 ```powershell
 uv run python -m alphalens_experiments.run_analysis `
@@ -66,19 +72,31 @@ uv run python -m alphalens_experiments.run_analysis `
   --periods 1 5 10
 ```
 
-Execution log is written to `reports/tearsheet_output.txt`.
+実行ログは `reports/tearsheet_output.txt` に出力されます。
 
-## Data contract
+## データ仕様
 
 - `prices`:
   - index: `DatetimeIndex`
-  - columns: asset ticker (example: `7203.T`)
-  - values: close price (`float`)
+  - columns: 銘柄ティッカー（例: `7203.T`）
+  - values: 終値（`float`）
 - `factor`:
   - index: `MultiIndex(date, asset)`
-  - values: factor score (`float`)
+  - values: ファクタースコア（`float`）
 
-## Notes
+## 補足
 
-- `uv.lock` is generated for reproducible environments.
-- Some warnings may come from third-party libs; current run is successful.
+- `uv.lock` は再現可能な環境構築のために生成されます。
+- サードパーティライブラリ由来の警告が出る場合がありますが、現時点の実行は成功しています。
+
+## ハーネス（Week 1 基盤）
+
+- エージェント向けポインタ: `AGENTS.md`
+- ADR: `docs/adr/ADR-0001-harness-policy.md`
+- 計画/実行テンプレート:
+  - `docs/templates/PLAN.md`
+  - `docs/templates/EXECUTE.md`
+- 決定論的な実行ループ:
+  1. `uv run ruff format .`
+  2. `uv run ruff check .`
+  3. `uv run pytest -q`

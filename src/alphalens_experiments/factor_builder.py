@@ -25,7 +25,8 @@ def make_randomized_factor_like_prices(
     """Convenience helper to generate dummy factor values from price shape."""
     rng = np.random.default_rng(seed)
     values = rng.normal(loc=0.0, scale=scale, size=prices.shape)
-    factor = pd.DataFrame(values, index=prices.index, columns=prices.columns).stack().rename("factor")
+    factor = (
+        pd.DataFrame(values, index=prices.index, columns=prices.columns).stack().rename("factor")
+    )
     factor.index = factor.index.set_names(["date", "asset"])
     return factor.sort_index()
-

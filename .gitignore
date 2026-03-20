@@ -20,6 +20,8 @@ dist/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+.pre-commit-cache/
+.uv-cache/
 
 # OS / editor
 .DS_Store
