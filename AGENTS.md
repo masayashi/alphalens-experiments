@@ -22,6 +22,7 @@ Alphalensを使用して株式の分析を行うためのプロジェクト
 3. `uv run ruff check .`
 4. `uv run mypy`
 5. `uv run pytest -q`
+6. Windows 権限制約環境では `scripts/run_quality_gate.ps1` を優先する。
 
 ## タスク進行
 
@@ -40,3 +41,8 @@ Alphalensを使用して株式の分析を行うためのプロジェクト
 
 - Stop 条件: `ruff check` / `mypy` / `pytest` の全通過。
 - 上記が通らない場合はタスクを完了扱いにしない。
+
+## ローカルフック
+
+- `scripts/setup_local_harness.ps1` で `core.hooksPath=.githooks` を設定する。
+- `.githooks/pre-commit.bat` はリポジトリ内キャッシュを使って品質ゲートを実行する。

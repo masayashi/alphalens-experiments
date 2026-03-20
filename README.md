@@ -55,6 +55,12 @@ uv run pytest -q
 uv run pre-commit install
 ```
 
+5. Windows 権限エラー回避のローカル設定（推奨）
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\setup_local_harness.ps1
+```
+
 ## クイックスタート
 
 1. 日本株サンプルデータ生成
@@ -103,3 +109,18 @@ uv run python -m alphalens_experiments.run_analysis `
   4. `uv run pytest -q`
 - Stop 条件:
   - `ruff check` / `mypy` / `pytest` がすべて成功していること。
+
+## 権限エラー対策
+
+このリポジトリでは、以下のキャッシュをリポジトリ内に固定することで、
+`AppData` 配下へのアクセス権限問題を回避します。
+
+- `UV_CACHE_DIR=.uv-cache`
+- `PRE_COMMIT_HOME=.pre-commit-cache`
+- `VIRTUALENV_OVERRIDE_APP_DATA=.virtualenv-cache`
+
+一括実行コマンド:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\run_quality_gate.ps1
+```
