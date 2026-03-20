@@ -115,3 +115,43 @@ def test_prepare_script_applies_weekday_and_missing_policy(tmp_path: Path) -> No
     prices = pd.read_parquet(out_dir / "prepared_prices_jp.parquet")
 
     assert list(prices.index.strftime("%Y-%m-%d")) == ["2025-01-03"]
+
+
+def test_prepare_script_applies_holiday_csv(tmp_path: Path) -> None:
+    raw_prices_path = tmp_path / "raw_prices_holiday.csv"
+    holiday_csv_path = tmp_path / "holidays.csv"
+    out_dir = tmp_path / "processed"
+
+    rows = [
+        {"date": "2025-01-03", "asset": "7203.T", "close": 1000.0},
+        {"date": "2025-01-03", "asset": "6758.T", "close": 2000.0},
+        {"date": "2025-01-06", "asset": "7203.T", "close": 1001.0},
+        {"date": "2025-01-06", "asset": "6758.T", "close": 2001.0},
+        {"date": "2025-01-07", "asset": "7203.T", "close": 1002.0},
+        {"date": "2025-01-07", "asset": "6758.T", "close": 2002.0},
+    ]
+    pd.DataFrame(rows).to_csv(raw_prices_path, index=False)
+    pd.DataFrame({"date": ["2025-01-06"]}).to_csv(holiday_csv_path, index=False)
+
+    run_prepare = subprocess.run(
+        [
+            sys.executable,
+            "scripts/prepare_raw_prices_csv.py",
+            "--raw-prices",
+            str(raw_prices_path),
+            "--out-dir",
+            str(out_dir),
+            "--lookback",
+            "1",
+            "--jpx-holidays-csv",
+            str(holiday_csv_path),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert run_prepare.returncode == 0, run_prepare.stderr
+
+    prices = pd.read_parquet(out_dir / "prepared_prices_jp.parquet")
+
+    assert list(prices.index.strftime("%Y-%m-%d")) == ["2025-01-03", "2025-01-07"]

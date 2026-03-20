@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from alphalens_experiments.calendar_policy import apply_jp_price_policy
+from alphalens_experiments.calendar_policy import apply_jp_price_policy, load_holidays_csv
 from alphalens_experiments.factor_builder import make_simple_momentum_factor
 
 
@@ -47,6 +47,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--lookback", type=int, default=5, help="Lookback days for momentum factor."
     )
+    parser.add_argument(
+        "--jpx-holidays-csv",
+        help="Optional CSV containing JP holiday dates in `date` column.",
+    )
     return parser.parse_args()
 
 
@@ -57,7 +61,8 @@ def main() -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
     raw_prices = _load_raw_prices(raw_prices_path)
-    prices = apply_jp_price_policy(raw_prices)
+    holidays = load_holidays_csv(args.jpx_holidays_csv) if args.jpx_holidays_csv else set()
+    prices = apply_jp_price_policy(raw_prices, holidays=holidays)
     factor = make_simple_momentum_factor(prices=prices, lookback=args.lookback)
 
     prices_path = out_dir / "prepared_prices_jp.parquet"
