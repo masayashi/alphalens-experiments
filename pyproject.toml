@@ -1,0 +1,40 @@
+[project]
+name = "alphalens-experiments"
+version = "0.1.0"
+description = "Alpha factor research scaffold for Japanese equities using Alphalens."
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+  "alphalens-reloaded>=0.4.6",
+  "pandas>=2.2.0",
+  "numpy>=1.26.0",
+  "scipy>=1.12.0",
+  "matplotlib>=3.8.0",
+  "seaborn>=0.13.0",
+  "jupyter>=1.0.0",
+  "pyarrow>=15.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+  "ruff>=0.5.0",
+]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
