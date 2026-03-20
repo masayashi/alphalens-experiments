@@ -1,15 +1,20 @@
 ﻿{
-  "updated_at": "2026-03-20T00:00:00+09:00",
-  "current_focus": "Week 1 ハーネス基盤",
+  "updated_at": "2026-03-20T12:30:00+09:00",
+  "current_focus": "日本株カレンダーと欠損日の仕様固定",
   "todo": [
-    "必要であれば Codex のローカル CLI フックを追加する",
-    "import と型ヒントに関する lint ルールを強化する",
-    "実データ入力向けの E2E カバレッジを拡張する"
+    "日本株カレンダーと欠損日の扱いを明文化しテストに追加する",
+    "複数ファクター比較の実験テンプレートを追加する",
+    "外部 API / DB 入力アダプタの雛形を追加する"
   ],
   "done": [
     "uv ベースの環境でプロジェクトをスキャフォールドした",
     "ruff と pytest による決定論的チェックを追加した",
-    "ADR と Plan/Execute テンプレートを追加した"
+    "ADR と Plan/Execute テンプレートを追加した",
+    "MVP DoD を計画書で固定し、Execute 記録を追加した",
+    "data_loader の asset 正規化を修正し回帰テストを追加した",
+    "run_quality_gate により ruff/mypy/pytest 全通過を確認した",
+    "Raw CSV から processed parquet を生成する導線を追加した",
+    "Raw CSV -> run_analysis の E2E テストを追加し回帰を固定した"
   ],
   "blocked": []
 }
