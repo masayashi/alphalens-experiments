@@ -80,3 +80,38 @@ def test_raw_csv_to_analysis_e2e(tmp_path: Path) -> None:
     log_path = Path("reports/tearsheet_output.txt")
     assert log_path.exists()
     assert "Rows in factor_data:" in log_path.read_text(encoding="utf-8")
+
+
+def test_prepare_script_applies_weekday_and_missing_policy(tmp_path: Path) -> None:
+    raw_prices_path = tmp_path / "raw_prices_with_gap.csv"
+    out_dir = tmp_path / "processed"
+
+    rows = [
+        {"date": "2025-01-03", "asset": "7203.T", "close": 1000.0},
+        {"date": "2025-01-03", "asset": "6758.T", "close": 2000.0},
+        {"date": "2025-01-04", "asset": "7203.T", "close": 1001.0},
+        {"date": "2025-01-04", "asset": "6758.T", "close": 2001.0},
+        {"date": "2025-01-06", "asset": "7203.T", "close": 1002.0},
+    ]
+    pd.DataFrame(rows).to_csv(raw_prices_path, index=False)
+
+    run_prepare = subprocess.run(
+        [
+            sys.executable,
+            "scripts/prepare_raw_prices_csv.py",
+            "--raw-prices",
+            str(raw_prices_path),
+            "--out-dir",
+            str(out_dir),
+            "--lookback",
+            "1",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert run_prepare.returncode == 0, run_prepare.stderr
+
+    prices = pd.read_parquet(out_dir / "prepared_prices_jp.parquet")
+
+    assert list(prices.index.strftime("%Y-%m-%d")) == ["2025-01-03"]
