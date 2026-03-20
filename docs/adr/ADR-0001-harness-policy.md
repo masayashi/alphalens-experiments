@@ -18,7 +18,8 @@
 
 1. `uv run ruff format .`
 2. `uv run ruff check .`
-3. `uv run pytest -q`
+3. `uv run mypy`
+4. `uv run pytest -q`
 
 あわせて次を採用します:
 
@@ -26,6 +27,7 @@
 - `docs/templates/` のテンプレートによる Plan/Execute 分離
 - 継続的に参照できるアーキテクチャ判断のための ADR
 - 確認済みバグごとの回帰テスト追加
+- CI で同一チェックを再実行し、ローカルとの差分をなくす
 
 ## 影響
 

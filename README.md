@@ -99,4 +99,7 @@ uv run python -m alphalens_experiments.run_analysis `
 - 決定論的な実行ループ:
   1. `uv run ruff format .`
   2. `uv run ruff check .`
-  3. `uv run pytest -q`
+  3. `uv run mypy`
+  4. `uv run pytest -q`
+- Stop 条件:
+  - `ruff check` / `mypy` / `pytest` がすべて成功していること。

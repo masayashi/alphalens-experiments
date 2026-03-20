@@ -1,6 +1,6 @@
 # 基本ルール
 やりとりは日本語で行うこと
-資料は日本語で記載すること
+資料とコミットログは日本語で記載すること
 
 # プロジェクト概要
 Alphalensを使用して株式の分析を行うためのプロジェクト
@@ -20,7 +20,8 @@ Alphalensを使用して株式の分析を行うためのプロジェクト
 1. `uv sync --extra dev`
 2. `uv run ruff format .`
 3. `uv run ruff check .`
-4. `uv run pytest -q`
+4. `uv run mypy`
+5. `uv run pytest -q`
 
 ## タスク進行
 
@@ -37,4 +38,5 @@ Alphalensを使用して株式の分析を行うためのプロジェクト
 
 ## 完了条件
 
-- lint と tests が通って初めてタスク完了とする。
+- Stop 条件: `ruff check` / `mypy` / `pytest` の全通過。
+- 上記が通らない場合はタスクを完了扱いにしない。

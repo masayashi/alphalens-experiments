@@ -22,6 +22,7 @@ dist/
 .mypy_cache/
 .pre-commit-cache/
 .uv-cache/
+.virtualenv-cache/
 
 # OS / editor
 .DS_Store
