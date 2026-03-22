@@ -174,3 +174,4 @@ uv run python scripts\run_real_data_pipeline.py `
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\run_quality_gate.ps1
 ```
+

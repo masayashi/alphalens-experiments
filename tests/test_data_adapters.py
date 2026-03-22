@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Literal
 import sqlite3
+from urllib.request import Request
 
 import pandas as pd
 import pytest
@@ -58,13 +59,13 @@ def test_api_adapter_stooq_loads_prices_with_mock(monkeypatch: pytest.MonkeyPatc
         "2025-01-02,201,202,200,201.5,1100\n"
     )
 
-    def fake_urlopen(url: str, timeout: float = 10.0) -> _FakeHttpResponse:
+    def fake_urlopen(request: Request, timeout: float = 10.0) -> _FakeHttpResponse:
         assert timeout == 10.0
-        if "7203.jp" in url:
+        if "7203.jp" in request.full_url:
             return _FakeHttpResponse(payload_7203)
-        if "6758.jp" in url:
+        if "6758.jp" in request.full_url:
             return _FakeHttpResponse(payload_6758)
-        raise AssertionError(f"unexpected url: {url}")
+        raise AssertionError(f"unexpected url: {request.full_url}")
 
     monkeypatch.setattr("alphalens_experiments.data_adapters.urlopen", fake_urlopen)
 
@@ -78,6 +79,28 @@ def test_api_adapter_stooq_loads_prices_with_mock(monkeypatch: pytest.MonkeyPatc
     assert loaded.columns.tolist() == ["7203.T", "6758.T"]
     assert list(loaded.index.strftime("%Y-%m-%d")) == ["2025-01-01", "2025-01-02"]
     assert float(loaded.loc[pd.Timestamp("2025-01-02"), "7203.T"]) == 101.5
+
+
+def test_api_adapter_httpcsv_uses_auth_header(monkeypatch: pytest.MonkeyPatch) -> None:
+    payload = "date,close\n2025-01-01,100.0\n2025-01-02,101.0\n"
+
+    def fake_urlopen(request: Request, timeout: float = 10.0) -> _FakeHttpResponse:
+        assert timeout == 10.0
+        assert request.full_url == "https://example.com/prices?symbol=7203.T"
+        assert request.headers["Authorization"] == "Bearer secret-token"
+        return _FakeHttpResponse(payload)
+
+    monkeypatch.setattr("alphalens_experiments.data_adapters.urlopen", fake_urlopen)
+
+    loaded = ApiPriceAdapter(
+        provider_name="httpcsv",
+        symbols=("7203.T",),
+        api_url="https://example.com/prices?symbol={symbol}",
+        auth_token="secret-token",
+    ).load_prices()
+
+    assert loaded.columns.tolist() == ["7203.T"]
+    assert list(loaded.index.strftime("%Y-%m-%d")) == ["2025-01-01", "2025-01-02"]
 
 
 def test_database_adapter_sqlite_loads_long_format(tmp_path: Path) -> None:
@@ -107,3 +130,6 @@ def test_build_adapter_requires_parameters() -> None:
 
     with pytest.raises(ValueError, match="source=api requires --symbols"):
         build_adapter(source="api", provider="stooq")
+
+    with pytest.raises(ValueError, match="provider=httpcsv requires --api-url"):
+        build_adapter(source="api", provider="httpcsv", symbols=("7203.T",)).load_prices()

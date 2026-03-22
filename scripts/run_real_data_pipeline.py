@@ -30,6 +30,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--path", help="Input path for source=csv")
     parser.add_argument("--provider", help="Provider name for source=api")
     parser.add_argument("--symbols", help="Comma-separated symbols for source=api")
+    parser.add_argument("--api-url", help="API URL for source=api provider=httpcsv")
+    parser.add_argument("--auth-token", help="Auth token for source=api")
+    parser.add_argument("--auth-header-name", default="Authorization")
+    parser.add_argument("--auth-header-prefix", default="Bearer ")
     parser.add_argument("--start", help="Start date for source=api")
     parser.add_argument("--end", help="End date for source=api")
     parser.add_argument("--dsn", help="DSN for source=db")
@@ -86,6 +90,10 @@ def main() -> None:
         path=args.path,
         provider=args.provider,
         symbols=_parse_symbols(args.symbols),
+        api_url=args.api_url,
+        auth_token=args.auth_token,
+        auth_header_name=args.auth_header_name,
+        auth_header_prefix=args.auth_header_prefix,
         start=args.start,
         end=args.end,
         dsn=args.dsn,

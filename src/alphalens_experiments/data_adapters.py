@@ -8,7 +8,7 @@ import sqlite3
 import time
 from urllib.error import URLError
 from urllib.parse import urlencode
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 import pandas as pd
 
@@ -71,20 +71,32 @@ class CsvPriceAdapter:
 
 @dataclass(frozen=True)
 class ApiPriceAdapter:
-    """Load prices from public HTTP APIs."""
+    """Load prices from HTTP APIs."""
 
     provider_name: str
     symbols: tuple[str, ...]
+    api_url: str | None = None
     start: str | None = None
     end: str | None = None
+    auth_token: str | None = None
+    auth_header_name: str = "Authorization"
+    auth_header_prefix: str = "Bearer "
     max_retries: int = 2
     retry_wait_seconds: float = 0.5
     timeout_seconds: float = 10.0
 
     def load_prices(self) -> pd.DataFrame:
         provider = self.provider_name.lower().strip()
-        if provider != "stooq":
-            raise ValueError(f"unsupported api provider: {self.provider_name}")
+
+        if provider == "stooq":
+            return self._load_stooq_prices()
+
+        if provider == "httpcsv":
+            return self._load_http_csv_prices()
+
+        raise ValueError(f"unsupported api provider: {self.provider_name}")
+
+    def _load_stooq_prices(self) -> pd.DataFrame:
         if not self.symbols:
             raise ValueError("api adapter requires at least one symbol")
 
@@ -100,27 +112,77 @@ class ApiPriceAdapter:
             prices = prices.loc[: pd.Timestamp(self.end)]
         return _normalize_wide_prices(prices)
 
+    def _load_http_csv_prices(self) -> pd.DataFrame:
+        if self.api_url is None:
+            raise ValueError("provider=httpcsv requires --api-url")
+        if not self.symbols:
+            raise ValueError("provider=httpcsv requires --symbols")
+
+        if "{symbol}" in self.api_url:
+            series_list: list[pd.Series] = []
+            for symbol in self.symbols:
+                url = self.api_url.replace("{symbol}", symbol)
+                frame = self._read_csv_from_url(url)
+                series_list.append(self._coerce_symbol_close_series(frame, symbol))
+            prices = pd.concat(series_list, axis=1)
+            prices.columns = list(self.symbols)
+            return _normalize_wide_prices(prices)
+
+        frame = self._read_csv_from_url(self.api_url)
+        prices = _coerce_long_to_wide(frame)
+        if self.start is not None:
+            prices = prices.loc[pd.Timestamp(self.start) :]
+        if self.end is not None:
+            prices = prices.loc[: pd.Timestamp(self.end)]
+        return _normalize_wide_prices(prices)
+
+    def _coerce_symbol_close_series(self, frame: pd.DataFrame, symbol: str) -> pd.Series:
+        lowered = {column.lower(): column for column in frame.columns}
+
+        if "date" not in lowered:
+            raise ValueError(f"httpcsv response must contain date column. symbol={symbol}")
+
+        date_col = lowered["date"]
+        close_col = lowered.get("close")
+        if close_col is None:
+            raise ValueError(f"httpcsv response must contain close column. symbol={symbol}")
+
+        series = pd.Series(
+            pd.to_numeric(frame[close_col], errors="coerce").to_numpy(),
+            index=pd.to_datetime(frame[date_col]),
+            name=symbol,
+        ).dropna()
+        return series.sort_index()
+
     def _fetch_stooq_close_series(self, symbol: str) -> pd.Series:
         query = urlencode({"s": self._to_stooq_symbol(symbol), "i": "d"})
         url = f"https://stooq.com/q/d/l/?{query}"
 
+        frame = self._read_csv_from_url(url)
+        if frame.empty:
+            raise ValueError(f"empty response for symbol={symbol}")
+        if "Date" not in frame.columns or "Close" not in frame.columns:
+            raise ValueError(f"invalid stooq response columns for symbol={symbol}")
+
+        series = pd.Series(
+            pd.to_numeric(frame["Close"], errors="coerce").to_numpy(),
+            index=pd.to_datetime(frame["Date"]),
+            name=symbol,
+        ).dropna()
+        return series.sort_index()
+
+    def _read_csv_from_url(self, url: str) -> pd.DataFrame:
         last_error: Exception | None = None
+
         for attempt in range(self.max_retries + 1):
             try:
-                with urlopen(url, timeout=self.timeout_seconds) as response:  # noqa: S310
+                request = Request(url, headers=self._build_headers())
+                with urlopen(request, timeout=self.timeout_seconds) as response:  # noqa: S310
                     payload = response.read().decode("utf-8")
                 frame = pd.read_csv(StringIO(payload))
                 if frame.empty:
-                    raise ValueError(f"empty response for symbol={symbol}")
-                if "Date" not in frame.columns or "Close" not in frame.columns:
-                    raise ValueError(f"invalid stooq response columns for symbol={symbol}")
-
-                series = pd.Series(
-                    pd.to_numeric(frame["Close"], errors="coerce").to_numpy(),
-                    index=pd.to_datetime(frame["Date"]),
-                    name=symbol,
-                ).dropna()
-                return series.sort_index()
+                    raise ValueError(f"empty response. url={url}")
+                return frame
             except (URLError, ValueError) as exc:
                 last_error = exc
                 if attempt >= self.max_retries:
@@ -128,9 +190,12 @@ class ApiPriceAdapter:
                 time.sleep(self.retry_wait_seconds)
 
         assert last_error is not None
-        raise RuntimeError(
-            f"failed to fetch stooq prices for symbol={symbol}: {last_error}"
-        ) from last_error
+        raise RuntimeError(f"failed to fetch prices from url={url}: {last_error}") from last_error
+
+    def _build_headers(self) -> dict[str, str]:
+        if self.auth_token is None:
+            return {}
+        return {self.auth_header_name: f"{self.auth_header_prefix}{self.auth_token}"}
 
     @staticmethod
     def _to_stooq_symbol(symbol: str) -> str:
@@ -173,8 +238,12 @@ def build_adapter(
     path: str | None = None,
     provider: str | None = None,
     symbols: tuple[str, ...] = (),
+    api_url: str | None = None,
     start: str | None = None,
     end: str | None = None,
+    auth_token: str | None = None,
+    auth_header_name: str = "Authorization",
+    auth_header_prefix: str = "Bearer ",
     dsn: str | None = None,
     query: str | None = None,
 ) -> PriceDataAdapter:
@@ -192,8 +261,12 @@ def build_adapter(
         return ApiPriceAdapter(
             provider_name=provider,
             symbols=symbols,
+            api_url=api_url,
             start=start,
             end=end,
+            auth_token=auth_token,
+            auth_header_name=auth_header_name,
+            auth_header_prefix=auth_header_prefix,
         )
 
     if source == "db":
