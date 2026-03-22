@@ -18,6 +18,7 @@ from alphalens_experiments.factor_builder import (
     make_simple_momentum_factor,
 )
 from alphalens_experiments.factor_compare import compare_factors
+from alphalens_experiments.holiday_fetcher import fetch_holidays_csv
 from alphalens_experiments.run_analysis import build_analysis_summary, run_alphalens_analysis
 
 
@@ -37,6 +38,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--processed-dir", default="data/processed")
     parser.add_argument("--lookback", type=int, default=5)
     parser.add_argument("--jpx-holidays-csv", help="Optional JP holiday CSV path")
+    parser.add_argument("--jpx-holidays-url", help="Optional JP holiday CSV URL")
+    parser.add_argument(
+        "--jpx-holidays-out",
+        default="configs/jpx_holidays_latest.csv",
+        help="Destination path when --jpx-holidays-url is used",
+    )
     parser.add_argument("--periods", nargs="+", type=int, default=[1, 5, 10])
     parser.add_argument("--max-loss", type=float, default=0.35)
     parser.add_argument("--analysis-summary-out", default="reports/analysis_summary.csv")
@@ -71,6 +78,9 @@ def _save_factor_chart(summary: pd.DataFrame, out_path: Path, metric: str = "mea
 def main() -> None:
     args = parse_args()
 
+    if args.jpx_holidays_csv and args.jpx_holidays_url:
+        raise ValueError("--jpx-holidays-csv and --jpx-holidays-url are mutually exclusive")
+
     adapter = build_adapter(
         source=args.source,
         path=args.path,
@@ -84,8 +94,13 @@ def main() -> None:
     loaded_prices = adapter.load_prices()
     raw_out = save_loaded_prices(loaded_prices, args.raw_out)
 
+    holidays_csv_path: str | None = args.jpx_holidays_csv
+    if args.jpx_holidays_url:
+        fetched = fetch_holidays_csv(args.jpx_holidays_url, args.jpx_holidays_out)
+        holidays_csv_path = str(fetched)
+
     raw_prices = CsvPriceAdapter(path=str(raw_out)).load_prices()
-    holidays = load_holidays_csv(args.jpx_holidays_csv) if args.jpx_holidays_csv else set()
+    holidays = load_holidays_csv(holidays_csv_path) if holidays_csv_path else set()
     prepared_prices = apply_jp_price_policy(raw_prices, holidays=holidays)
     prepared_factor = make_simple_momentum_factor(prices=prepared_prices, lookback=args.lookback)
 

@@ -7,6 +7,7 @@ import pandas as pd
 
 from alphalens_experiments.calendar_policy import apply_jp_price_policy, load_holidays_csv
 from alphalens_experiments.factor_builder import make_simple_momentum_factor
+from alphalens_experiments.holiday_fetcher import fetch_holidays_csv
 
 
 def _load_raw_prices(path: Path) -> pd.DataFrame:
@@ -51,6 +52,15 @@ def parse_args() -> argparse.Namespace:
         "--jpx-holidays-csv",
         help="Optional CSV containing JP holiday dates in `date` column.",
     )
+    parser.add_argument(
+        "--jpx-holidays-url",
+        help="Optional URL to fetch JP holiday CSV automatically.",
+    )
+    parser.add_argument(
+        "--jpx-holidays-out",
+        default="configs/jpx_holidays_latest.csv",
+        help="Destination path when --jpx-holidays-url is used.",
+    )
     return parser.parse_args()
 
 
@@ -60,8 +70,16 @@ def main() -> None:
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    if args.jpx_holidays_csv and args.jpx_holidays_url:
+        raise ValueError("--jpx-holidays-csv and --jpx-holidays-url are mutually exclusive")
+
+    holidays_csv_path: str | None = args.jpx_holidays_csv
+    if args.jpx_holidays_url:
+        fetched = fetch_holidays_csv(args.jpx_holidays_url, args.jpx_holidays_out)
+        holidays_csv_path = str(fetched)
+
     raw_prices = _load_raw_prices(raw_prices_path)
-    holidays = load_holidays_csv(args.jpx_holidays_csv) if args.jpx_holidays_csv else set()
+    holidays = load_holidays_csv(holidays_csv_path) if holidays_csv_path else set()
     prices = apply_jp_price_policy(raw_prices, holidays=holidays)
     factor = make_simple_momentum_factor(prices=prices, lookback=args.lookback)
 

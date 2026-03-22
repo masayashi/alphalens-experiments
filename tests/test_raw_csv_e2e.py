@@ -159,3 +159,39 @@ def test_prepare_script_applies_holiday_csv(tmp_path: Path) -> None:
     prices = pd.read_parquet(out_dir / "prepared_prices_jp.parquet")
 
     assert list(prices.index.strftime("%Y-%m-%d")) == ["2025-01-03", "2025-01-07"]
+
+
+def test_prepare_script_rejects_conflicting_holiday_options(tmp_path: Path) -> None:
+    raw_prices_path = tmp_path / "raw_prices.csv"
+    out_dir = tmp_path / "processed"
+    holiday_csv_path = tmp_path / "holidays.csv"
+
+    pd.DataFrame(
+        {
+            "date": ["2025-01-01", "2025-01-02"],
+            "7203.T": [100.0, 101.0],
+            "6758.T": [200.0, 201.0],
+        }
+    ).to_csv(raw_prices_path, index=False)
+    pd.DataFrame({"date": ["2025-01-01"]}).to_csv(holiday_csv_path, index=False)
+
+    run_prepare = subprocess.run(
+        [
+            sys.executable,
+            "scripts/prepare_raw_prices_csv.py",
+            "--raw-prices",
+            str(raw_prices_path),
+            "--out-dir",
+            str(out_dir),
+            "--jpx-holidays-csv",
+            str(holiday_csv_path),
+            "--jpx-holidays-url",
+            "https://example.com/holidays.csv",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert run_prepare.returncode != 0
+    assert "mutually exclusive" in run_prepare.stderr

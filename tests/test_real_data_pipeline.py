@@ -52,3 +52,39 @@ def test_run_real_data_pipeline_with_csv_source(tmp_path: Path) -> None:
     assert (reports_dir / "analysis_summary.csv").exists()
     assert (reports_dir / "multi_factor_summary.csv").exists()
     assert (reports_dir / "multi_factor_summary.png").exists()
+
+
+def test_run_real_data_pipeline_rejects_conflicting_holiday_options(tmp_path: Path) -> None:
+    raw_csv = tmp_path / "raw_prices.csv"
+    pd.DataFrame(
+        {
+            "date": ["2025-01-01", "2025-01-02"],
+            "7203.T": [100.0, 101.0],
+            "6758.T": [200.0, 201.0],
+        }
+    ).to_csv(raw_csv, index=False)
+
+    holidays_csv = tmp_path / "holidays.csv"
+    pd.DataFrame({"date": ["2025-01-01"]}).to_csv(holidays_csv, index=False)
+
+    run_pipeline = subprocess.run(
+        [
+            sys.executable,
+            "scripts/run_real_data_pipeline.py",
+            "--source",
+            "csv",
+            "--path",
+            str(raw_csv),
+            "--jpx-holidays-csv",
+            str(holidays_csv),
+            "--jpx-holidays-url",
+            "https://example.com/holidays.csv",
+            "--skip-tearsheet",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert run_pipeline.returncode != 0
+    assert "mutually exclusive" in run_pipeline.stderr

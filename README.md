@@ -103,6 +103,25 @@ uv run python scripts\run_real_data_pipeline.py `
   --skip-tearsheet
 ```
 
+- 祝日CSVをURLから自動取得（公式URLは運用側で指定）:
+
+```powershell
+uv run python scripts\fetch_jpx_holidays_csv.py `
+  --url "https://example.com/jpx-holidays.csv" `
+  --out configs\jpx_holidays_latest.csv
+```
+
+- 一気通貫パイプラインで祝日CSVを自動取得して利用:
+
+```powershell
+uv run python scripts\run_real_data_pipeline.py `
+  --source csv `
+  --path data\raw\your_prices.csv `
+  --jpx-holidays-url "https://example.com/jpx-holidays.csv" `
+  --jpx-holidays-out configs\jpx_holidays_latest.csv `
+  --skip-tearsheet
+```
+
 出力物:
 - `data/raw/adapter_loaded_prices.csv`
 - `data/processed/prepared_prices_jp.parquet`
