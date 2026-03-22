@@ -1,4 +1,4 @@
-# alphalens-experiments
+﻿# alphalens-experiments
 
 日本株のファクター分析を `alphalens`（`alphalens-reloaded`）で行うためのスキャフォールドです。
 
@@ -78,7 +78,38 @@ uv run python -m alphalens_experiments.run_analysis `
   --periods 1 5 10
 ```
 
-実行ログは `reports/tearsheet_output.txt` に出力されます。
+実行ログは `reports/tearsheet_output.txt`、要約は `reports/analysis_summary.csv` に出力されます。
+
+## 実データパイプライン
+
+- CSV 入力（long/wide）から一気通貫で実行:
+
+```powershell
+uv run python scripts\run_real_data_pipeline.py `
+  --source csv `
+  --path data\raw\your_prices.csv `
+  --skip-tearsheet
+```
+
+- API 入力（`stooq`）の例:
+
+```powershell
+uv run python scripts\run_real_data_pipeline.py `
+  --source api `
+  --provider stooq `
+  --symbols 7203.T,6758.T,9432.T `
+  --start 2024-01-01 `
+  --end 2025-12-31 `
+  --skip-tearsheet
+```
+
+出力物:
+- `data/raw/adapter_loaded_prices.csv`
+- `data/processed/prepared_prices_jp.parquet`
+- `data/processed/prepared_factor_jp.parquet`
+- `reports/analysis_summary.csv`
+- `reports/multi_factor_summary.csv`
+- `reports/multi_factor_summary.png`
 
 ## データ仕様
 
