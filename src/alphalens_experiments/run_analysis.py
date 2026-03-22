@@ -35,8 +35,15 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _forward_return_columns(factor_data: pd.DataFrame) -> list[object]:
+    excluded = {"factor", "factor_quantile", "group"}
+    return [column for column in factor_data.columns if str(column) not in excluded]
+
+
 def build_analysis_summary(factor_data: pd.DataFrame) -> pd.DataFrame:
     ic = al.performance.factor_information_coefficient(factor_data)
+    forward_cols = _forward_return_columns(factor_data)
+
     summary: dict[str, float | int | str] = {
         "n_rows": int(len(factor_data)),
         "n_assets": int(factor_data.index.get_level_values("asset").nunique()),
@@ -45,8 +52,27 @@ def build_analysis_summary(factor_data: pd.DataFrame) -> pd.DataFrame:
         "mean_factor": float(factor_data["factor"].mean()),
         "std_factor": float(factor_data["factor"].std()),
     }
+
     for column in ic.columns:
         summary[f"mean_ic_{column}"] = float(ic[column].mean())
+
+    quantile_means = factor_data.groupby("factor_quantile")[forward_cols].mean()
+    top_quantile = int(quantile_means.index.max())
+    bottom_quantile = int(quantile_means.index.min())
+
+    summary["top_quantile"] = top_quantile
+    summary["bottom_quantile"] = bottom_quantile
+
+    for column in forward_cols:
+        column_name = str(column)
+        top_value = float(quantile_means.loc[top_quantile, column])
+        bottom_value = float(quantile_means.loc[bottom_quantile, column])
+        summary[f"mean_ret_q{top_quantile}_{column_name}"] = top_value
+        summary[f"mean_ret_q{bottom_quantile}_{column_name}"] = bottom_value
+        summary[f"mean_ret_spread_q{top_quantile}_q{bottom_quantile}_{column_name}"] = (
+            top_value - bottom_value
+        )
+
     return pd.DataFrame([summary])
 
 

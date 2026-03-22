@@ -85,6 +85,11 @@ def test_raw_csv_to_analysis_e2e(tmp_path: Path) -> None:
     assert "Rows in factor_data:" in log_path.read_text(encoding="utf-8")
     assert summary_path.exists()
 
+    summary = pd.read_csv(summary_path)
+    assert "top_quantile" in summary.columns
+    assert "bottom_quantile" in summary.columns
+    assert "mean_ret_spread_q5_q1_1D" in summary.columns
+
 
 def test_prepare_script_applies_weekday_and_missing_policy(tmp_path: Path) -> None:
     raw_prices_path = tmp_path / "raw_prices_with_gap.csv"
