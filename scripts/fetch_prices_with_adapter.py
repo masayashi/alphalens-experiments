@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
 from alphalens_experiments.data_adapters import build_adapter, save_loaded_prices
@@ -14,6 +15,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--symbols", help="Comma-separated symbols for source=api")
     parser.add_argument("--api-url", help="API URL for source=api provider=httpcsv")
     parser.add_argument("--auth-token", help="Auth token for source=api")
+    parser.add_argument("--auth-token-env", default="ALPHALENS_API_TOKEN")
     parser.add_argument("--auth-header-name", default="Authorization")
     parser.add_argument("--auth-header-prefix", default="Bearer ")
     parser.add_argument("--start", help="Start date for source=api (YYYY-MM-DD)")
@@ -31,8 +33,16 @@ def _parse_symbols(raw: str | None) -> tuple[str, ...]:
     return symbols
 
 
+def _resolve_auth_token(explicit_token: str | None, env_name: str) -> str | None:
+    if explicit_token is not None:
+        return explicit_token
+    return os.getenv(env_name)
+
+
 def main() -> None:
     args = parse_args()
+
+    auth_token = _resolve_auth_token(args.auth_token, args.auth_token_env)
 
     try:
         adapter = build_adapter(
@@ -43,7 +53,7 @@ def main() -> None:
             api_url=args.api_url,
             start=args.start,
             end=args.end,
-            auth_token=args.auth_token,
+            auth_token=auth_token,
             auth_header_name=args.auth_header_name,
             auth_header_prefix=args.auth_header_prefix,
             dsn=args.dsn,

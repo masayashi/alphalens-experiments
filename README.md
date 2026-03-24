@@ -101,9 +101,7 @@ uv run python scripts\run_real_data_pipeline.py `
   --start 2024-01-01 `
   --end 2025-12-31 `
   --skip-tearsheet
-```
-
-- 祝日CSVをURLから自動取得（公式URLは運用側で指定）:
+```\n\nトークン設定例（PowerShell）:\n\n```powershell\n$env:ALPHALENS_API_TOKEN = "<YOUR_TOKEN>"\n```\n\n- 祝日CSVをURLから自動取得（公式URLは運用側で指定）:
 
 ```powershell
 uv run python scripts\fetch_jpx_holidays_csv.py `
@@ -174,5 +172,6 @@ uv run python scripts\run_real_data_pipeline.py `
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\run_quality_gate.ps1
 ```
+
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 
 import alphalens as al
@@ -32,6 +33,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--symbols", help="Comma-separated symbols for source=api")
     parser.add_argument("--api-url", help="API URL for source=api provider=httpcsv")
     parser.add_argument("--auth-token", help="Auth token for source=api")
+    parser.add_argument("--auth-token-env", default="ALPHALENS_API_TOKEN")
     parser.add_argument("--auth-header-name", default="Authorization")
     parser.add_argument("--auth-header-prefix", default="Bearer ")
     parser.add_argument("--start", help="Start date for source=api")
@@ -63,6 +65,12 @@ def _parse_symbols(raw: str | None) -> tuple[str, ...]:
     return tuple(symbol.strip() for symbol in raw.split(",") if symbol.strip())
 
 
+def _resolve_auth_token(explicit_token: str | None, env_name: str) -> str | None:
+    if explicit_token is not None:
+        return explicit_token
+    return os.getenv(env_name)
+
+
 def _save_factor_chart(summary: pd.DataFrame, out_path: Path, metric: str = "mean_abs_ic") -> None:
     if metric not in summary.columns:
         raise ValueError(f"summary must contain '{metric}' column")
@@ -85,13 +93,15 @@ def main() -> None:
     if args.jpx_holidays_csv and args.jpx_holidays_url:
         raise ValueError("--jpx-holidays-csv and --jpx-holidays-url are mutually exclusive")
 
+    auth_token = _resolve_auth_token(args.auth_token, args.auth_token_env)
+
     adapter = build_adapter(
         source=args.source,
         path=args.path,
         provider=args.provider,
         symbols=_parse_symbols(args.symbols),
         api_url=args.api_url,
-        auth_token=args.auth_token,
+        auth_token=auth_token,
         auth_header_name=args.auth_header_name,
         auth_header_prefix=args.auth_header_prefix,
         start=args.start,

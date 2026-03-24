@@ -103,6 +103,16 @@ def test_api_adapter_httpcsv_uses_auth_header(monkeypatch: pytest.MonkeyPatch) -
     assert list(loaded.index.strftime("%Y-%m-%d")) == ["2025-01-01", "2025-01-02"]
 
 
+def test_api_adapter_httpcsv_requires_auth_token() -> None:
+    with pytest.raises(ValueError, match="provider=httpcsv requires auth token"):
+        ApiPriceAdapter(
+            provider_name="httpcsv",
+            symbols=("7203.T",),
+            api_url="https://example.com/prices?symbol={symbol}",
+            auth_token=None,
+        ).load_prices()
+
+
 def test_database_adapter_sqlite_loads_long_format(tmp_path: Path) -> None:
     db_path = tmp_path / "prices.db"
     connection = sqlite3.connect(db_path)

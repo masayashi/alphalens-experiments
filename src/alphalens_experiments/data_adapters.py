@@ -117,6 +117,8 @@ class ApiPriceAdapter:
             raise ValueError("provider=httpcsv requires --api-url")
         if not self.symbols:
             raise ValueError("provider=httpcsv requires --symbols")
+        if self.auth_token is None:
+            raise ValueError("provider=httpcsv requires auth token")
 
         if "{symbol}" in self.api_url:
             series_list: list[pd.Series] = []
