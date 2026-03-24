@@ -189,7 +189,7 @@ class ApiPriceAdapter:
                 last_error = exc
                 if attempt >= self.max_retries or not self._is_retryable_http_error(exc):
                     break
-                time.sleep(self._backoff_seconds(attempt))
+                time.sleep(self._retry_delay_seconds(exc, attempt))
             except URLError as exc:
                 last_error = exc
                 if attempt >= self.max_retries:
@@ -215,6 +215,22 @@ class ApiPriceAdapter:
 
     def _backoff_seconds(self, attempt: int) -> float:
         return self.retry_wait_seconds * (2**attempt)
+
+    def _retry_delay_seconds(self, exc: HTTPError, attempt: int) -> float:
+        headers = exc.headers
+        if headers is None:
+            return self._backoff_seconds(attempt)
+
+        retry_after = headers.get("Retry-After")
+        if retry_after is None:
+            return self._backoff_seconds(attempt)
+
+        try:
+            retry_after_seconds = float(retry_after)
+        except ValueError:
+            return self._backoff_seconds(attempt)
+
+        return max(0.0, retry_after_seconds)
 
     def _build_headers(self) -> dict[str, str]:
         if self.auth_token is None:

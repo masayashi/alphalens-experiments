@@ -1,8 +1,8 @@
 ﻿{
-  "updated_at": "2026-03-24T11:05:00+09:00",
-  "current_focus": "実データ運用の最終調整（Retry-After対応・追加分析指標）",
+  "updated_at": "2026-03-24T11:30:00+09:00",
+  "current_focus": "実データ運用の最終調整（Retry-After HTTP-date対応・追加分析指標）",
   "todo": [
-    "Retry-Afterヘッダを解釈した待機制御を追加する",
+    "Retry-After のHTTP-date形式を解釈する",
     "分位リターンの年率換算/t値など分析指標を拡張する",
     "OSシークレットストア連携方針を設計する"
   ],
@@ -29,7 +29,8 @@
     "認証付きAPIアダプタ（httpcsv + auth header）を追加した",
     "analysis_summary.csv に分位リターンとスプレッド指標を追加した",
     "APIトークンを環境変数で運用するCLI標準を追加した",
-    "APIレート制限向け指数バックオフを実装した"
+    "APIレート制限向け指数バックオフを実装した",
+    "Retry-After ヘッダ優先の待機制御を実装した"
   ],
   "blocked": []
 }
