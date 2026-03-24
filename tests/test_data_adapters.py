@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from email.message import Message
 from pathlib import Path
 from typing import Literal
 import sqlite3
+from urllib.error import HTTPError
 from urllib.request import Request
 
 import pandas as pd
@@ -111,6 +113,36 @@ def test_api_adapter_httpcsv_requires_auth_token() -> None:
             api_url="https://example.com/prices?symbol={symbol}",
             auth_token=None,
         ).load_prices()
+
+
+def test_api_adapter_httpcsv_retries_with_exponential_backoff(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = "date,close\n2025-01-01,100.0\n2025-01-02,101.0\n"
+    calls = {"count": 0}
+    slept: list[float] = []
+
+    def fake_urlopen(request: Request, timeout: float = 10.0) -> _FakeHttpResponse:
+        assert timeout == 10.0
+        calls["count"] += 1
+        if calls["count"] <= 2:
+            raise HTTPError(request.full_url, 429, "Too Many Requests", hdrs=Message(), fp=None)
+        return _FakeHttpResponse(payload)
+
+    monkeypatch.setattr("alphalens_experiments.data_adapters.urlopen", fake_urlopen)
+    monkeypatch.setattr("alphalens_experiments.data_adapters.time.sleep", slept.append)
+
+    loaded = ApiPriceAdapter(
+        provider_name="httpcsv",
+        symbols=("7203.T",),
+        api_url="https://example.com/prices?symbol={symbol}",
+        auth_token="secret-token",
+        max_retries=3,
+        retry_wait_seconds=0.2,
+    ).load_prices()
+
+    assert loaded.columns.tolist() == ["7203.T"]
+    assert slept == [0.2, 0.4]
 
 
 def test_database_adapter_sqlite_loads_long_format(tmp_path: Path) -> None:

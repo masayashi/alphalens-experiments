@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Protocol
 import sqlite3
 import time
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -185,14 +185,36 @@ class ApiPriceAdapter:
                 if frame.empty:
                     raise ValueError(f"empty response. url={url}")
                 return frame
-            except (URLError, ValueError) as exc:
+            except HTTPError as exc:
+                last_error = exc
+                if attempt >= self.max_retries or not self._is_retryable_http_error(exc):
+                    break
+                time.sleep(self._backoff_seconds(attempt))
+            except URLError as exc:
                 last_error = exc
                 if attempt >= self.max_retries:
                     break
-                time.sleep(self.retry_wait_seconds)
+                time.sleep(self._backoff_seconds(attempt))
+            except ValueError as exc:
+                last_error = exc
+                if attempt >= self.max_retries or not self._is_retryable_value_error(exc):
+                    break
+                time.sleep(self._backoff_seconds(attempt))
 
         assert last_error is not None
         raise RuntimeError(f"failed to fetch prices from url={url}: {last_error}") from last_error
+
+    @staticmethod
+    def _is_retryable_http_error(exc: HTTPError) -> bool:
+        return exc.code in {429, 500, 502, 503, 504}
+
+    @staticmethod
+    def _is_retryable_value_error(exc: ValueError) -> bool:
+        message = str(exc).lower()
+        return "empty response" in message
+
+    def _backoff_seconds(self, attempt: int) -> float:
+        return self.retry_wait_seconds * (2**attempt)
 
     def _build_headers(self) -> dict[str, str]:
         if self.auth_token is None:
