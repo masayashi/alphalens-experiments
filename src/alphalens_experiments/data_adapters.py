@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from email.utils import parsedate_to_datetime
 from io import StringIO
 from pathlib import Path
 from typing import Protocol
@@ -228,9 +229,25 @@ class ApiPriceAdapter:
         try:
             retry_after_seconds = float(retry_after)
         except ValueError:
-            return self._backoff_seconds(attempt)
+            parsed_seconds = self._retry_after_http_date_seconds(retry_after)
+            if parsed_seconds is None:
+                return self._backoff_seconds(attempt)
+            return parsed_seconds
 
         return max(0.0, retry_after_seconds)
+
+    @staticmethod
+    def _retry_after_http_date_seconds(value: str) -> float | None:
+        try:
+            retry_after_dt = parsedate_to_datetime(value)
+        except (TypeError, ValueError):
+            return None
+        if retry_after_dt is None:
+            return None
+
+        # parsedate_to_datetime can return naive dt for some formats.
+        retry_after_ts = retry_after_dt.timestamp()
+        return max(0.0, retry_after_ts - time.time())
 
     def _build_headers(self) -> dict[str, str]:
         if self.auth_token is None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from email.message import Message
+from email.utils import formatdate
 from pathlib import Path
 from typing import Literal
 import sqlite3
@@ -173,6 +174,38 @@ def test_api_adapter_httpcsv_uses_retry_after_header(monkeypatch: pytest.MonkeyP
 
     assert loaded.columns.tolist() == ["7203.T"]
     assert slept == [3.0]
+
+
+def test_api_adapter_httpcsv_uses_retry_after_http_date(monkeypatch: pytest.MonkeyPatch) -> None:
+    payload = "date,close\n2025-01-01,100.0\n2025-01-02,101.0\n"
+    calls = {"count": 0}
+    slept: list[float] = []
+    now_epoch = 1_700_000_000.0
+
+    def fake_urlopen(request: Request, timeout: float = 10.0) -> _FakeHttpResponse:
+        assert timeout == 10.0
+        calls["count"] += 1
+        if calls["count"] == 1:
+            headers = Message()
+            headers["Retry-After"] = formatdate(now_epoch + 5.0, usegmt=True)
+            raise HTTPError(request.full_url, 429, "Too Many Requests", hdrs=headers, fp=None)
+        return _FakeHttpResponse(payload)
+
+    monkeypatch.setattr("alphalens_experiments.data_adapters.urlopen", fake_urlopen)
+    monkeypatch.setattr("alphalens_experiments.data_adapters.time.sleep", slept.append)
+    monkeypatch.setattr("alphalens_experiments.data_adapters.time.time", lambda: now_epoch)
+
+    loaded = ApiPriceAdapter(
+        provider_name="httpcsv",
+        symbols=("7203.T",),
+        api_url="https://example.com/prices?symbol={symbol}",
+        auth_token="secret-token",
+        max_retries=3,
+        retry_wait_seconds=0.2,
+    ).load_prices()
+
+    assert loaded.columns.tolist() == ["7203.T"]
+    assert slept == [5.0]
 
 
 def test_database_adapter_sqlite_loads_long_format(tmp_path: Path) -> None:
