@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from email.utils import parsedate_to_datetime
 from io import StringIO
 from pathlib import Path
+import random
 from typing import Protocol
 import sqlite3
 import time
@@ -84,6 +85,7 @@ class ApiPriceAdapter:
     auth_header_prefix: str = "Bearer "
     max_retries: int = 2
     retry_wait_seconds: float = 0.5
+    retry_jitter_ratio: float = 0.1
     timeout_seconds: float = 10.0
 
     def load_prices(self) -> pd.DataFrame:
@@ -215,7 +217,8 @@ class ApiPriceAdapter:
         return "empty response" in message
 
     def _backoff_seconds(self, attempt: int) -> float:
-        return self.retry_wait_seconds * (2**attempt)
+        base_seconds = self.retry_wait_seconds * (2**attempt)
+        return self._apply_jitter(base_seconds)
 
     def _retry_delay_seconds(self, exc: HTTPError, attempt: int) -> float:
         headers = exc.headers
@@ -248,6 +251,14 @@ class ApiPriceAdapter:
         # parsedate_to_datetime can return naive dt for some formats.
         retry_after_ts = retry_after_dt.timestamp()
         return max(0.0, retry_after_ts - time.time())
+
+    def _apply_jitter(self, seconds: float) -> float:
+        ratio = self.retry_jitter_ratio
+        if ratio <= 0.0:
+            return seconds
+        lower = max(0.0, seconds * (1.0 - ratio))
+        upper = seconds * (1.0 + ratio)
+        return random.uniform(lower, upper)
 
     def _build_headers(self) -> dict[str, str]:
         if self.auth_token is None:

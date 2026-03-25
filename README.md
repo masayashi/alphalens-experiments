@@ -78,7 +78,7 @@ uv run python -m alphalens_experiments.run_analysis `
   --periods 1 5 10
 ```
 
-実行ログは `reports/tearsheet_output.txt`、要約は `reports/analysis_summary.csv` に出力されます（IC に加えて分位リターンと上位-下位スプレッドを含む）。
+実行ログは `reports/tearsheet_output.txt`、要約は `reports/analysis_summary.csv` に出力されます（IC、分位リターン、上位-下位スプレッド、スプレッドt値、年率換算を含む）。
 
 ## 実データパイプライン
 
@@ -172,6 +172,8 @@ uv run python scripts\run_real_data_pipeline.py `
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\run_quality_gate.ps1
 ```
+
+- APIトークン運用方針: `docs/specs/api-token-operation-policy.md`
 
 
 

@@ -89,6 +89,8 @@ def test_raw_csv_to_analysis_e2e(tmp_path: Path) -> None:
     assert "top_quantile" in summary.columns
     assert "bottom_quantile" in summary.columns
     assert "mean_ret_spread_q5_q1_1D" in summary.columns
+    assert "tstat_ret_spread_q5_q1_1D" in summary.columns
+    assert "ann_ret_spread_q5_q1_1D" in summary.columns
 
 
 def test_prepare_script_applies_weekday_and_missing_policy(tmp_path: Path) -> None:

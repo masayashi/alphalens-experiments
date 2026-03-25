@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import re
 
 import alphalens as al
+import numpy as np
 import pandas as pd
 
 from .data_loader import load_factor, load_prices
@@ -40,6 +42,25 @@ def _forward_return_columns(factor_data: pd.DataFrame) -> list[object]:
     return [column for column in factor_data.columns if str(column) not in excluded]
 
 
+def _extract_period_days(column_name: str) -> int:
+    match = re.search(r"(\d+)", column_name)
+    if match is None:
+        return 1
+    return max(1, int(match.group(1)))
+
+
+def _safe_t_stat(series: pd.Series) -> float:
+    cleaned = series.dropna()
+    n = len(cleaned)
+    if n < 2:
+        return 0.0
+    std = float(cleaned.std(ddof=1))
+    if std == 0.0:
+        return 0.0
+    mean = float(cleaned.mean())
+    return mean / (std / np.sqrt(n))
+
+
 def build_analysis_summary(factor_data: pd.DataFrame) -> pd.DataFrame:
     ic = al.performance.factor_information_coefficient(factor_data)
     forward_cols = _forward_return_columns(factor_data)
@@ -67,11 +88,24 @@ def build_analysis_summary(factor_data: pd.DataFrame) -> pd.DataFrame:
         column_name = str(column)
         top_value = float(quantile_means.loc[top_quantile, column])
         bottom_value = float(quantile_means.loc[bottom_quantile, column])
+        spread_value = top_value - bottom_value
         summary[f"mean_ret_q{top_quantile}_{column_name}"] = top_value
         summary[f"mean_ret_q{bottom_quantile}_{column_name}"] = bottom_value
-        summary[f"mean_ret_spread_q{top_quantile}_q{bottom_quantile}_{column_name}"] = (
-            top_value - bottom_value
+        summary[f"mean_ret_spread_q{top_quantile}_q{bottom_quantile}_{column_name}"] = spread_value
+
+        by_date_quantile = (
+            factor_data.reset_index()
+            .groupby(["date", "factor_quantile"])[column]
+            .mean()
+            .unstack("factor_quantile")
         )
+        spread_series = by_date_quantile[top_quantile] - by_date_quantile[bottom_quantile]
+        summary[f"tstat_ret_spread_q{top_quantile}_q{bottom_quantile}_{column_name}"] = (
+            _safe_t_stat(spread_series)
+        )
+        period_days = _extract_period_days(column_name)
+        annualized = spread_value * (252.0 / period_days)
+        summary[f"ann_ret_spread_q{top_quantile}_q{bottom_quantile}_{column_name}"] = annualized
 
     return pd.DataFrame([summary])
 
