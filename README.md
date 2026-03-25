@@ -183,6 +183,7 @@ uv run python scripts\run_real_data_pipeline.py `
 - `UV_CACHE_DIR=.uv-cache`
 - `PRE_COMMIT_HOME=.pre-commit-cache`
 - `VIRTUALENV_OVERRIDE_APP_DATA=.virtualenv-cache`
+- API再試行ポリシー設定: `configs/api_retry_policy.json`
 
 一括実行コマンド:
 

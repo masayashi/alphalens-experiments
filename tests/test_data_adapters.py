@@ -4,6 +4,7 @@ from email.message import Message
 from email.utils import formatdate
 from pathlib import Path
 from typing import Literal
+import json
 import sqlite3
 from urllib.error import HTTPError
 from urllib.request import Request
@@ -273,6 +274,57 @@ def test_api_adapter_stooq_uses_plain_backoff_policy(monkeypatch: pytest.MonkeyP
 
     assert loaded.columns.tolist() == ["7203.T"]
     assert slept == [0.2]
+
+
+def test_api_adapter_stooq_respects_external_retry_policy(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    policy_path = tmp_path / "api_retry_policy.json"
+    policy_path.write_text(
+        json.dumps(
+            {
+                "stooq": {
+                    "retryable_http_statuses": [429, 500, 502, 503, 504],
+                    "use_retry_after": True,
+                    "use_jitter": True,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("ALPHALENS_RETRY_POLICY_PATH", str(policy_path))
+
+    payload = (
+        "Date,Open,High,Low,Close,Volume\n"
+        "2025-01-01,100,101,99,100.5,1000\n"
+        "2025-01-02,101,102,100,101.5,1200\n"
+    )
+    calls = {"count": 0}
+    slept: list[float] = []
+
+    def fake_urlopen(request: Request, timeout: float = 10.0) -> _FakeHttpResponse:
+        assert timeout == 10.0
+        calls["count"] += 1
+        if calls["count"] == 1:
+            headers = Message()
+            headers["Retry-After"] = "2"
+            raise HTTPError(request.full_url, 429, "Too Many Requests", hdrs=headers, fp=None)
+        return _FakeHttpResponse(payload)
+
+    monkeypatch.setattr("alphalens_experiments.data_adapters.urlopen", fake_urlopen)
+    monkeypatch.setattr("alphalens_experiments.data_adapters.time.sleep", slept.append)
+    monkeypatch.setattr("alphalens_experiments.data_adapters.random.uniform", lambda lo, hi: hi)
+
+    loaded = ApiPriceAdapter(
+        provider_name="stooq",
+        symbols=("7203.T",),
+        max_retries=2,
+        retry_wait_seconds=0.2,
+        retry_jitter_ratio=0.1,
+    ).load_prices()
+
+    assert loaded.columns.tolist() == ["7203.T"]
+    assert slept == [2.0]
 
 
 def test_database_adapter_sqlite_loads_long_format(tmp_path: Path) -> None:

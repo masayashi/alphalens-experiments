@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from email.utils import parsedate_to_datetime
 from io import StringIO
+import json
+import os
 from pathlib import Path
 import random
 from typing import Protocol
@@ -20,6 +22,50 @@ class PriceDataAdapter(Protocol):
 
     def load_prices(self) -> pd.DataFrame:
         """Return wide-form price table indexed by datetime."""
+
+
+DEFAULT_RETRY_POLICY: dict[str, dict[str, object]] = {
+    "stooq": {
+        "retryable_http_statuses": [429, 500, 502, 503, 504],
+        "use_retry_after": False,
+        "use_jitter": False,
+    },
+    "httpcsv": {
+        "retryable_http_statuses": [429, 500, 502, 503, 504],
+        "use_retry_after": True,
+        "use_jitter": True,
+    },
+}
+
+
+def _retry_policy_path() -> Path:
+    configured = os.getenv("ALPHALENS_RETRY_POLICY_PATH")
+    if configured:
+        return Path(configured)
+    return Path("configs/api_retry_policy.json")
+
+
+def _load_retry_policy() -> dict[str, dict[str, object]]:
+    path = _retry_policy_path()
+    if not path.exists():
+        return DEFAULT_RETRY_POLICY
+
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return DEFAULT_RETRY_POLICY
+
+    if not isinstance(loaded, dict):
+        return DEFAULT_RETRY_POLICY
+
+    merged = {key: value.copy() for key, value in DEFAULT_RETRY_POLICY.items()}
+    for provider, policy in loaded.items():
+        if not isinstance(provider, str) or not isinstance(policy, dict):
+            continue
+        base = merged.get(provider, {}).copy()
+        base.update(policy)
+        merged[provider] = base
+    return merged
 
 
 def _normalize_wide_prices(prices: pd.DataFrame) -> pd.DataFrame:
@@ -208,10 +254,6 @@ class ApiPriceAdapter:
         raise RuntimeError(f"failed to fetch prices from url={url}: {last_error}") from last_error
 
     @staticmethod
-    def _is_retryable_http_error(exc: HTTPError) -> bool:
-        return exc.code in {429, 500, 502, 503, 504}
-
-    @staticmethod
     def _is_retryable_value_error(exc: ValueError) -> bool:
         message = str(exc).lower()
         return "empty response" in message
@@ -267,12 +309,25 @@ class ApiPriceAdapter:
         return random.uniform(lower, upper)
 
     def _provider_uses_retry_after(self) -> bool:
-        provider = self.provider_name.lower().strip()
-        return provider == "httpcsv"
+        return bool(self._provider_policy().get("use_retry_after", False))
 
     def _provider_uses_jitter(self) -> bool:
+        return bool(self._provider_policy().get("use_jitter", False))
+
+    def _provider_policy(self) -> dict[str, object]:
         provider = self.provider_name.lower().strip()
-        return provider == "httpcsv"
+        policies = _load_retry_policy()
+        return policies.get(provider, DEFAULT_RETRY_POLICY.get(provider, {}))
+
+    def _is_retryable_http_error(self, exc: HTTPError) -> bool:
+        statuses = self._provider_policy().get("retryable_http_statuses", [])
+        if not isinstance(statuses, list):
+            return False
+        try:
+            allowed = {int(status) for status in statuses}
+        except (TypeError, ValueError):
+            return False
+        return exc.code in allowed
 
     def _build_headers(self) -> dict[str, str]:
         if self.auth_token is None:

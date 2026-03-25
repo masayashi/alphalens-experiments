@@ -1,0 +1,12 @@
+{
+  "stooq": {
+    "retryable_http_statuses": [429, 500, 502, 503, 504],
+    "use_retry_after": false,
+    "use_jitter": false
+  },
+  "httpcsv": {
+    "retryable_http_statuses": [429, 500, 502, 503, 504],
+    "use_retry_after": true,
+    "use_jitter": true
+  }
+}
