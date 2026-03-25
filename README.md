@@ -193,6 +193,7 @@ powershell -ExecutionPolicy Bypass -File scripts\run_quality_gate.ps1
 ```
 
 - APIトークン運用方針: `docs/specs/api-token-operation-policy.md`
+- 実装サマリーと試行手順: `docs/specs/implementation-summary-2026-03-25.md`
 
 
 
