@@ -241,6 +241,40 @@ def test_api_adapter_httpcsv_applies_jitter_to_backoff(monkeypatch: pytest.Monke
     assert slept == pytest.approx([0.22])
 
 
+def test_api_adapter_stooq_uses_plain_backoff_policy(monkeypatch: pytest.MonkeyPatch) -> None:
+    payload = (
+        "Date,Open,High,Low,Close,Volume\n"
+        "2025-01-01,100,101,99,100.5,1000\n"
+        "2025-01-02,101,102,100,101.5,1200\n"
+    )
+    calls = {"count": 0}
+    slept: list[float] = []
+
+    def fake_urlopen(request: Request, timeout: float = 10.0) -> _FakeHttpResponse:
+        assert timeout == 10.0
+        calls["count"] += 1
+        if calls["count"] == 1:
+            headers = Message()
+            headers["Retry-After"] = "9"
+            raise HTTPError(request.full_url, 429, "Too Many Requests", hdrs=headers, fp=None)
+        return _FakeHttpResponse(payload)
+
+    monkeypatch.setattr("alphalens_experiments.data_adapters.urlopen", fake_urlopen)
+    monkeypatch.setattr("alphalens_experiments.data_adapters.time.sleep", slept.append)
+    monkeypatch.setattr("alphalens_experiments.data_adapters.random.uniform", lambda lo, hi: hi)
+
+    loaded = ApiPriceAdapter(
+        provider_name="stooq",
+        symbols=("7203.T",),
+        max_retries=2,
+        retry_wait_seconds=0.2,
+        retry_jitter_ratio=0.1,
+    ).load_prices()
+
+    assert loaded.columns.tolist() == ["7203.T"]
+    assert slept == [0.2]
+
+
 def test_database_adapter_sqlite_loads_long_format(tmp_path: Path) -> None:
     db_path = tmp_path / "prices.db"
     connection = sqlite3.connect(db_path)

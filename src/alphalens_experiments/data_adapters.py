@@ -221,6 +221,9 @@ class ApiPriceAdapter:
         return self._apply_jitter(base_seconds)
 
     def _retry_delay_seconds(self, exc: HTTPError, attempt: int) -> float:
+        if not self._provider_uses_retry_after():
+            return self._backoff_seconds(attempt)
+
         headers = exc.headers
         if headers is None:
             return self._backoff_seconds(attempt)
@@ -253,12 +256,23 @@ class ApiPriceAdapter:
         return max(0.0, retry_after_ts - time.time())
 
     def _apply_jitter(self, seconds: float) -> float:
+        if not self._provider_uses_jitter():
+            return seconds
+
         ratio = self.retry_jitter_ratio
         if ratio <= 0.0:
             return seconds
         lower = max(0.0, seconds * (1.0 - ratio))
         upper = seconds * (1.0 + ratio)
         return random.uniform(lower, upper)
+
+    def _provider_uses_retry_after(self) -> bool:
+        provider = self.provider_name.lower().strip()
+        return provider == "httpcsv"
+
+    def _provider_uses_jitter(self) -> bool:
+        provider = self.provider_name.lower().strip()
+        return provider == "httpcsv"
 
     def _build_headers(self) -> dict[str, str]:
         if self.auth_token is None:
