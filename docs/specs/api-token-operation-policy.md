@@ -39,6 +39,27 @@ $env:ALPHALENS_API_TOKEN = "<TOKEN>"
   - 既定ユーザー名は `default`。
   - keyring が未導入/未設定でも処理継続し、最終的にトークン未解決として失敗させる。
 
+### Windows 導入手順（例）
+
+```powershell
+uv run python -m pip install keyring keyrings.alt
+uv run python -c "import keyring; keyring.set_password('alphalens-experiments/api-token','default','<TOKEN>')"
+```
+
+### macOS 導入手順（例）
+
+```bash
+uv run python -m pip install keyring
+uv run python -c "import keyring; keyring.set_password('alphalens-experiments/api-token','default','<TOKEN>')"
+```
+
+### Linux 導入手順（例）
+
+```bash
+uv run python -m pip install keyring secretstorage
+uv run python -c "import keyring; keyring.set_password('alphalens-experiments/api-token','default','<TOKEN>')"
+```
+
 ## セキュリティガード
 
 - トークン値を例外メッセージ・ログに出さない。

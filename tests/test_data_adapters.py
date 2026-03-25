@@ -337,7 +337,7 @@ def test_api_adapter_rejects_invalid_retry_policy_schema(
     )
     monkeypatch.setenv("ALPHALENS_RETRY_POLICY_PATH", str(policy_path))
 
-    with pytest.raises(RuntimeError, match="use_jitter must be bool"):
+    with pytest.raises(RuntimeError, match="schema validation failed"):
         ApiPriceAdapter(
             provider_name="stooq",
             symbols=("7203.T",),

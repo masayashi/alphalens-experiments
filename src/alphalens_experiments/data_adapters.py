@@ -15,6 +15,8 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 import pandas as pd
+from jsonschema import Draft202012Validator
+from jsonschema.exceptions import ValidationError
 
 
 class PriceDataAdapter(Protocol):
@@ -35,6 +37,26 @@ DEFAULT_RETRY_POLICY: dict[str, dict[str, object]] = {
         "use_retry_after": True,
         "use_jitter": True,
     },
+}
+
+RETRY_POLICY_SCHEMA: dict[str, object] = {
+    "type": "object",
+    "patternProperties": {
+        "^.+$": {
+            "type": "object",
+            "properties": {
+                "retryable_http_statuses": {
+                    "type": "array",
+                    "items": {"type": "integer", "minimum": 100, "maximum": 599},
+                },
+                "use_retry_after": {"type": "boolean"},
+                "use_jitter": {"type": "boolean"},
+            },
+            "additionalProperties": False,
+            "minProperties": 1,
+        }
+    },
+    "additionalProperties": False,
 }
 
 
@@ -75,68 +97,28 @@ def _load_retry_policy() -> dict[str, dict[str, object]]:
     if not isinstance(loaded, dict):
         raise RuntimeError(f"retry policy config root must be object: {path}")
 
+    _validate_retry_policy_schema(loaded, path=path)
+
     merged = _clone_retry_policy(DEFAULT_RETRY_POLICY)
     for provider, policy in loaded.items():
-        if not isinstance(provider, str) or not isinstance(policy, dict):
-            raise RuntimeError(
-                f"retry policy config invalid provider entry: provider={provider!r} path={path}"
-            )
-        base = _validate_retry_policy_entry(provider, policy, path=path)
+        assert isinstance(provider, str)
+        assert isinstance(policy, dict)
         merged_base = merged.get(provider, {})
-        merged_base.update(base)
+        merged_base.update(policy)
         merged[provider] = merged_base
     return merged
 
 
-def _validate_retry_policy_entry(
-    provider: str, policy: dict[str, object], *, path: Path
-) -> dict[str, object]:
-    allowed_keys = {"retryable_http_statuses", "use_retry_after", "use_jitter"}
-    unknown = set(policy) - allowed_keys
-    if unknown:
-        raise RuntimeError(
-            f"retry policy config contains unknown keys for provider={provider}: {sorted(unknown)} path={path}"
-        )
+def _validate_retry_policy_schema(payload: dict[str, object], *, path: Path) -> None:
+    validator = Draft202012Validator(RETRY_POLICY_SCHEMA)
+    errors = sorted(validator.iter_errors(payload), key=lambda err: err.json_path)
+    if not errors:
+        return
 
-    validated: dict[str, object] = {}
-
-    if "retryable_http_statuses" in policy:
-        statuses = policy["retryable_http_statuses"]
-        if not isinstance(statuses, list):
-            raise RuntimeError(
-                f"retryable_http_statuses must be list for provider={provider} path={path}"
-            )
-        validated_statuses: list[int] = []
-        for status in statuses:
-            if not isinstance(status, int):
-                raise RuntimeError(
-                    f"retryable_http_statuses must contain int for provider={provider} path={path}"
-                )
-            if status < 100 or status > 599:
-                raise RuntimeError(
-                    f"retryable_http_statuses out of range for provider={provider}: {status} path={path}"
-                )
-            validated_statuses.append(status)
-        validated["retryable_http_statuses"] = validated_statuses
-
-    if "use_retry_after" in policy:
-        use_retry_after = policy["use_retry_after"]
-        if not isinstance(use_retry_after, bool):
-            raise RuntimeError(f"use_retry_after must be bool for provider={provider} path={path}")
-        validated["use_retry_after"] = use_retry_after
-
-    if "use_jitter" in policy:
-        use_jitter = policy["use_jitter"]
-        if not isinstance(use_jitter, bool):
-            raise RuntimeError(f"use_jitter must be bool for provider={provider} path={path}")
-        validated["use_jitter"] = use_jitter
-
-    if not validated:
-        raise RuntimeError(
-            f"retry policy config for provider={provider} must include at least one key path={path}"
-        )
-
-    return validated
+    first: ValidationError = errors[0]
+    raise RuntimeError(
+        f"retry policy config schema validation failed: path={path} at={first.json_path} msg={first.message}"
+    )
 
 
 def _normalize_wide_prices(prices: pd.DataFrame) -> pd.DataFrame:
