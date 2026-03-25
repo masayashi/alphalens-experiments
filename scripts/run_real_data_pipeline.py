@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import os
 from pathlib import Path
 
 import alphalens as al
@@ -21,6 +20,7 @@ from alphalens_experiments.factor_builder import (
 from alphalens_experiments.factor_compare import compare_factors
 from alphalens_experiments.holiday_fetcher import fetch_holidays_csv
 from alphalens_experiments.run_analysis import build_analysis_summary, run_alphalens_analysis
+from alphalens_experiments.secret_resolver import resolve_api_token
 
 
 def parse_args() -> argparse.Namespace:
@@ -34,6 +34,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--api-url", help="API URL for source=api provider=httpcsv")
     parser.add_argument("--auth-token", help="Auth token for source=api")
     parser.add_argument("--auth-token-env", default="ALPHALENS_API_TOKEN")
+    parser.add_argument("--auth-token-keyring-service", default="alphalens-experiments/api-token")
+    parser.add_argument("--auth-token-keyring-username", default="default")
     parser.add_argument("--auth-header-name", default="Authorization")
     parser.add_argument("--auth-header-prefix", default="Bearer ")
     parser.add_argument("--start", help="Start date for source=api")
@@ -65,12 +67,6 @@ def _parse_symbols(raw: str | None) -> tuple[str, ...]:
     return tuple(symbol.strip() for symbol in raw.split(",") if symbol.strip())
 
 
-def _resolve_auth_token(explicit_token: str | None, env_name: str) -> str | None:
-    if explicit_token is not None:
-        return explicit_token
-    return os.getenv(env_name)
-
-
 def _save_factor_chart(summary: pd.DataFrame, out_path: Path, metric: str = "mean_abs_ic") -> None:
     if metric not in summary.columns:
         raise ValueError(f"summary must contain '{metric}' column")
@@ -93,7 +89,12 @@ def main() -> None:
     if args.jpx_holidays_csv and args.jpx_holidays_url:
         raise ValueError("--jpx-holidays-csv and --jpx-holidays-url are mutually exclusive")
 
-    auth_token = _resolve_auth_token(args.auth_token, args.auth_token_env)
+    auth_token = resolve_api_token(
+        explicit_token=args.auth_token,
+        env_name=args.auth_token_env,
+        keyring_service=args.auth_token_keyring_service,
+        keyring_username=args.auth_token_keyring_username,
+    )
 
     adapter = build_adapter(
         source=args.source,

@@ -101,7 +101,24 @@ uv run python scripts\run_real_data_pipeline.py `
   --start 2024-01-01 `
   --end 2025-12-31 `
   --skip-tearsheet
-```\n\nトークン設定例（PowerShell）:\n\n```powershell\n$env:ALPHALENS_API_TOKEN = "<YOUR_TOKEN>"\n```\n\n- 祝日CSVをURLから自動取得（公式URLは運用側で指定）:
+```
+
+- 認証付きAPI入力（`httpcsv`）の例:
+
+```powershell
+$env:ALPHALENS_API_TOKEN = "<YOUR_TOKEN>"
+uv run python scripts\run_real_data_pipeline.py `
+  --source api `
+  --provider httpcsv `
+  --symbols 7203.T,6758.T `
+  --api-url "https://api.example.com/prices?symbol={symbol}" `
+  --auth-token-env "ALPHALENS_API_TOKEN" `
+  --auth-token-keyring-service "alphalens-experiments/api-token" `
+  --auth-token-keyring-username "default" `
+  --skip-tearsheet
+```
+
+- 祝日CSVをURLから自動取得（公式URLは運用側で指定）:
 
 ```powershell
 uv run python scripts\fetch_jpx_holidays_csv.py `

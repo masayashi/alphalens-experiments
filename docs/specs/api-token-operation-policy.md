@@ -1,4 +1,4 @@
-﻿# APIトークン運用方針（案）
+﻿# APIトークン運用方針
 
 ## 目的
 
@@ -6,7 +6,9 @@
 
 ## 現行実装
 
-- CLIは `--auth-token` よりも `--auth-token-env`（既定: `ALPHALENS_API_TOKEN`）運用を推奨。
+- CLIの解決順は `--auth-token` > `--auth-token-env` > `keyring`。
+- `--auth-token-env` の既定値は `ALPHALENS_API_TOKEN`。
+- `--auth-token-keyring-service` / `--auth-token-keyring-username` で keyring 参照先を指定できる。
 - `provider=httpcsv` はトークン未設定時に即時失敗する。
 
 ## 推奨運用
@@ -19,22 +21,23 @@
 $env:ALPHALENS_API_TOKEN = "<TOKEN>"
 ```
 
-- 永続化する場合は OS シークレットストアの利用を優先し、平文ファイル保存を避ける。
+- 永続化する場合は OS シークレットストア（keyring バックエンド）を優先し、平文ファイル保存を避ける。
 
 2. CI/CD
 
 - CI の Secret 機能（GitHub Actions Secrets 等）で `ALPHALENS_API_TOKEN` を注入する。
 - ワークフロー上のログ出力でトークンを展開しない。
 
-## OSシークレットストア連携（次段階）
+## OSシークレットストア連携
 
 - 候補:
   - Windows Credential Manager
   - macOS Keychain
   - Linux Secret Service
 - 実装方針:
-  - 優先順位を `--auth-token` > `環境変数` > `OSシークレットストア` とする。
-  - ストア参照キーは `alphalens-experiments/api-token` を既定値として統一する。
+  - 既定サービス名は `alphalens-experiments/api-token`。
+  - 既定ユーザー名は `default`。
+  - keyring が未導入/未設定でも処理継続し、最終的にトークン未解決として失敗させる。
 
 ## セキュリティガード
 
