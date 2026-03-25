@@ -38,6 +38,21 @@ DEFAULT_RETRY_POLICY: dict[str, dict[str, object]] = {
 }
 
 
+def _clone_retry_policy(
+    policy: dict[str, dict[str, object]],
+) -> dict[str, dict[str, object]]:
+    cloned: dict[str, dict[str, object]] = {}
+    for provider, values in policy.items():
+        cloned_values: dict[str, object] = {}
+        for key, value in values.items():
+            if isinstance(value, list):
+                cloned_values[key] = list(value)
+            else:
+                cloned_values[key] = value
+        cloned[provider] = cloned_values
+    return cloned
+
+
 def _retry_policy_path() -> Path:
     configured = os.getenv("ALPHALENS_RETRY_POLICY_PATH")
     if configured:
@@ -48,24 +63,80 @@ def _retry_policy_path() -> Path:
 def _load_retry_policy() -> dict[str, dict[str, object]]:
     path = _retry_policy_path()
     if not path.exists():
-        return DEFAULT_RETRY_POLICY
+        return _clone_retry_policy(DEFAULT_RETRY_POLICY)
 
     try:
         loaded = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return DEFAULT_RETRY_POLICY
+    except OSError as exc:
+        raise RuntimeError(f"failed to read retry policy config: {path}") from exc
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"retry policy config is not valid json: {path}") from exc
 
     if not isinstance(loaded, dict):
-        return DEFAULT_RETRY_POLICY
+        raise RuntimeError(f"retry policy config root must be object: {path}")
 
-    merged = {key: value.copy() for key, value in DEFAULT_RETRY_POLICY.items()}
+    merged = _clone_retry_policy(DEFAULT_RETRY_POLICY)
     for provider, policy in loaded.items():
         if not isinstance(provider, str) or not isinstance(policy, dict):
-            continue
-        base = merged.get(provider, {}).copy()
-        base.update(policy)
-        merged[provider] = base
+            raise RuntimeError(
+                f"retry policy config invalid provider entry: provider={provider!r} path={path}"
+            )
+        base = _validate_retry_policy_entry(provider, policy, path=path)
+        merged_base = merged.get(provider, {})
+        merged_base.update(base)
+        merged[provider] = merged_base
     return merged
+
+
+def _validate_retry_policy_entry(
+    provider: str, policy: dict[str, object], *, path: Path
+) -> dict[str, object]:
+    allowed_keys = {"retryable_http_statuses", "use_retry_after", "use_jitter"}
+    unknown = set(policy) - allowed_keys
+    if unknown:
+        raise RuntimeError(
+            f"retry policy config contains unknown keys for provider={provider}: {sorted(unknown)} path={path}"
+        )
+
+    validated: dict[str, object] = {}
+
+    if "retryable_http_statuses" in policy:
+        statuses = policy["retryable_http_statuses"]
+        if not isinstance(statuses, list):
+            raise RuntimeError(
+                f"retryable_http_statuses must be list for provider={provider} path={path}"
+            )
+        validated_statuses: list[int] = []
+        for status in statuses:
+            if not isinstance(status, int):
+                raise RuntimeError(
+                    f"retryable_http_statuses must contain int for provider={provider} path={path}"
+                )
+            if status < 100 or status > 599:
+                raise RuntimeError(
+                    f"retryable_http_statuses out of range for provider={provider}: {status} path={path}"
+                )
+            validated_statuses.append(status)
+        validated["retryable_http_statuses"] = validated_statuses
+
+    if "use_retry_after" in policy:
+        use_retry_after = policy["use_retry_after"]
+        if not isinstance(use_retry_after, bool):
+            raise RuntimeError(f"use_retry_after must be bool for provider={provider} path={path}")
+        validated["use_retry_after"] = use_retry_after
+
+    if "use_jitter" in policy:
+        use_jitter = policy["use_jitter"]
+        if not isinstance(use_jitter, bool):
+            raise RuntimeError(f"use_jitter must be bool for provider={provider} path={path}")
+        validated["use_jitter"] = use_jitter
+
+    if not validated:
+        raise RuntimeError(
+            f"retry policy config for provider={provider} must include at least one key path={path}"
+        )
+
+    return validated
 
 
 def _normalize_wide_prices(prices: pd.DataFrame) -> pd.DataFrame:

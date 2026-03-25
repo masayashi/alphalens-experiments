@@ -327,6 +327,26 @@ def test_api_adapter_stooq_respects_external_retry_policy(
     assert slept == [2.0]
 
 
+def test_api_adapter_rejects_invalid_retry_policy_schema(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    policy_path = tmp_path / "api_retry_policy_invalid.json"
+    policy_path.write_text(
+        json.dumps({"stooq": {"use_jitter": "yes"}}),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("ALPHALENS_RETRY_POLICY_PATH", str(policy_path))
+
+    with pytest.raises(RuntimeError, match="use_jitter must be bool"):
+        ApiPriceAdapter(
+            provider_name="stooq",
+            symbols=("7203.T",),
+            max_retries=2,
+            retry_wait_seconds=0.2,
+            retry_jitter_ratio=0.0,
+        )._provider_policy()
+
+
 def test_database_adapter_sqlite_loads_long_format(tmp_path: Path) -> None:
     db_path = tmp_path / "prices.db"
     connection = sqlite3.connect(db_path)
